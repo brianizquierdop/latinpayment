@@ -1,6 +1,6 @@
 import React from 'react';
 import CollectJSSection from "./CollectJSSection";
-import {Link} from "react-router-dom";
+
 
 class InlineCartPage extends React.Component {
   constructor(props) {
