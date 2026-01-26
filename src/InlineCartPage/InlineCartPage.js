@@ -60,9 +60,7 @@ class InlineCartPage extends React.Component {
       <div className="App">
         <div>
           <h1>Payment Credit Card</h1>
-         <!-- <Link to="/">Home Page</Link>-->
          
-         <!-- <Link to="/lightbox">Lightbox cart page</Link> -->
         </div>
         <br />
         { this.state.alertMessage && (
