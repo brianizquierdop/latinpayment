@@ -10,7 +10,7 @@ export default function App() {
       <Router>
         <Route exact path="/inline" render={props => <InlineCartPage {...props} />} />
         <Route exact path="/lightbox" render={props => <LightboxCartPage {...props} />} />
-        <Route exact path="/" render={props => <HomePage {...props} />} />
+        <Route exact path="/" render={props => <InlineCartPage {...props} />} />
       </Router>
     </div>
   );
