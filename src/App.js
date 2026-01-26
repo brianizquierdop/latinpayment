@@ -1,17 +1,18 @@
 import React from 'react';
-import {BrowserRouter as Router, Route} from 'react-router-dom';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+
 import InlineCartPage from './InlineCartPage/InlineCartPage';
 import LightboxCartPage from './LightboxCartPage/LightboxCartPage';
-import HomePage from './HomePage/HomePage';
+// import HomePage from './HomePage/HomePage'; // opcional, si lo quieres después
 
 export default function App() {
   return (
-    <div>
-      <Router>
-        <Route exact path="/inline" render={props => <InlineCartPage {...props} />} />
-        <Route exact path="/lightbox" render={props => <LightboxCartPage {...props} />} />
-        <Route exact path="/" render={props => <HomePage {...props} />} />
-      </Router>
-    </div>
+    <Router>
+      <Switch>
+        <Route exact path="/" component={InlineCartPage} />
+        <Route exact path="/inline" component={InlineCartPage} />
+        <Route exact path="/lightbox" component={LightboxCartPage} />
+      </Switch>
+    </Router>
   );
 }
