@@ -60,7 +60,6 @@ class InlineCartPage extends React.Component {
       <div className="App">
         <div>
           <h1>Payment Credit Card</h1>
-         
         </div>
         <br />
         { this.state.alertMessage && (
