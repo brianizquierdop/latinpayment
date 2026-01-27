@@ -1,0 +1,373 @@
+// ============================================
+// EJEMPLO: Integración Gateway con Zoho Creator
+// Método: XML API Moderno
+// ============================================
+
+// CONFIGURACIÓN
+GATEWAY_XML_URL = "https://secure.networkmerchants.com/api/transrequest.php";
+SECURITY_KEY = "TU_SECURITY_KEY_AQUI"; // ⚠️ CAMBIAR ESTO
+
+// ============================================
+// FUNCIÓN PRINCIPAL: Procesar Pago con XML API
+// ============================================
+void procesarPagoXML()
+{
+    // Obtener datos del formulario
+    nombre = input.Nombre;
+    apellido = input.Apellido;
+    email = input.Email;
+    direccion = input.Direccion;
+    ciudad = input.Ciudad;
+    estado = input.Estado;
+    codigoPostal = input.Codigo_Postal;
+    monto = input.Monto;
+    numeroTarjeta = input.Numero_Tarjeta;
+    fechaExpiracion = input.Fecha_Expiracion; // Formato: YYYY-MM
+    cvv = input.CVV;
+    
+    // Construir XML de solicitud
+    xmlRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+        "<createTransactionRequest xmlns=\"AnetApi/xml/v1/schema/AnetApiSchema.xsd\">" +
+            "<merchantAuthentication>" +
+                "<name>merchant_name</name>" +
+                "<transactionKey>" + SECURITY_KEY + "</transactionKey>" +
+            "</merchantAuthentication>" +
+            "<refId>REF" + zoho.currenttime.toString("yyyyMMddHHmmss") + "</refId>" +
+            "<transactionRequest>" +
+                "<transactionType>authCaptureTransaction</transactionType>" +
+                "<amount>" + monto.toString() + "</amount>" +
+                "<payment>" +
+                    "<creditCard>" +
+                        "<cardNumber>" + numeroTarjeta + "</cardNumber>" +
+                        "<expirationDate>" + fechaExpiracion + "</expirationDate>" +
+                        "<cardCode>" + cvv + "</cardCode>" +
+                    "</creditCard>" +
+                "</payment>" +
+                "<order>" +
+                    "<invoiceNumber>INV-" + zoho.currenttime.toString("yyyyMMddHHmmss") + "</invoiceNumber>" +
+                    "<description>Pago desde Zoho Creator</description>" +
+                "</order>" +
+                "<billTo>" +
+                    "<firstName>" + nombre + "</firstName>" +
+                    "<lastName>" + apellido + "</lastName>" +
+                    "<address>" + direccion + "</address>" +
+                    "<city>" + ciudad + "</city>" +
+                    "<state>" + estado + "</state>" +
+                    "<zip>" + codigoPostal + "</zip>" +
+                    "<country>US</country>" +
+                    "<email>" + email + "</email>" +
+                "</billTo>" +
+                "<customerIP>" + zoho.loginuser.get("IP_Address") + "</customerIP>" +
+            "</transactionRequest>" +
+        "</createTransactionRequest>";
+    
+    try
+    {
+        // Enviar solicitud XML
+        respuesta = invokeurl
+        [
+            url: GATEWAY_XML_URL
+            type: POST
+            parameters: xmlRequest
+            headers: {"Content-Type": "application/xml"}
+        ];
+        
+        // Procesar respuesta XML
+        procesarRespuestaXML(respuesta);
+    }
+    catch(e)
+    {
+        info "Error al conectar con el gateway: " + e;
+        alert "Error de conexión. Por favor, intente nuevamente.";
+    }
+}
+
+// ============================================
+// FUNCIÓN: Procesar Respuesta XML
+// ============================================
+void procesarRespuestaXML(string respuestaXML)
+{
+    // Parsear XML
+    try
+    {
+        // Extraer código de respuesta
+        codigoRespuesta = respuestaXML.getXmlValue("//resultCode");
+        
+        if(codigoRespuesta == "Ok")
+        {
+            // ✅ TRANSACCIÓN APROBADA
+            transaccionID = respuestaXML.getXmlValue("//transId");
+            codigoAutorizacion = respuestaXML.getXmlValue("//authCode");
+            mensajeRespuesta = respuestaXML.getXmlValue("//description");
+            
+            info "✅ Pago aprobado exitosamente";
+            info "ID de Transacción: " + transaccionID;
+            info "Código de Autorización: " + codigoAutorizacion;
+            
+            // Guardar información
+            input.Estado_Pago = "Aprobado";
+            input.Transaccion_ID = transaccionID;
+            input.Codigo_Autorizacion = codigoAutorizacion;
+            input.Fecha_Pago = zoho.currenttime;
+            
+            alert "¡Pago procesado exitosamente!\nID: " + transaccionID;
+        }
+        else
+        {
+            // ❌ ERROR O RECHAZO
+            codigoError = respuestaXML.getXmlValue("//code");
+            mensajeError = respuestaXML.getXmlValue("//text");
+            
+            info "❌ Transacción fallida";
+            info "Código: " + codigoError;
+            info "Mensaje: " + mensajeError;
+            
+            input.Estado_Pago = "Rechazado";
+            input.Mensaje_Error = mensajeError;
+            
+            alert "Error: " + mensajeError;
+        }
+    }
+    catch(e)
+    {
+        info "Error al procesar respuesta XML: " + e;
+        alert "Error al procesar la respuesta del gateway.";
+    }
+}
+
+// ============================================
+// FUNCIÓN: Solo Autorizar (sin capturar)
+// ============================================
+void autorizarPagoXML()
+{
+    // Similar pero con <transactionType>authOnlyTransaction</transactionType>
+    xmlRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+        "<createTransactionRequest xmlns=\"AnetApi/xml/v1/schema/AnetApiSchema.xsd\">" +
+            "<merchantAuthentication>" +
+                "<name>merchant_name</name>" +
+                "<transactionKey>" + SECURITY_KEY + "</transactionKey>" +
+            "</merchantAuthentication>" +
+            "<transactionRequest>" +
+                "<transactionType>authOnlyTransaction</transactionType>" +
+                // ... resto del XML
+            "</transactionRequest>" +
+        "</createTransactionRequest>";
+    
+    // Enviar y procesar...
+}
+
+// ============================================
+// FUNCIÓN: Capturar Pago Autorizado
+// ============================================
+void capturarPagoXML(string transaccionID)
+{
+    xmlRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+        "<createTransactionRequest xmlns=\"AnetApi/xml/v1/schema/AnetApiSchema.xsd\">" +
+            "<merchantAuthentication>" +
+                "<name>merchant_name</name>" +
+                "<transactionKey>" + SECURITY_KEY + "</transactionKey>" +
+            "</merchantAuthentication>" +
+            "<transactionRequest>" +
+                "<transactionType>priorAuthCaptureTransaction</transactionType>" +
+                "<refTransId>" + transaccionID + "</refTransId>" +
+            "</transactionRequest>" +
+        "</createTransactionRequest>";
+    
+    try
+    {
+        respuesta = invokeurl
+        [
+            url: GATEWAY_XML_URL
+            type: POST
+            parameters: xmlRequest
+            headers: {"Content-Type": "application/xml"}
+        ];
+        
+        procesarRespuestaXML(respuesta);
+    }
+    catch(e)
+    {
+        info "Error al capturar pago: " + e;
+    }
+}
+
+// ============================================
+// FUNCIÓN: Reembolsar Transacción
+// ============================================
+void reembolsarPagoXML(string transaccionID, decimal monto, string ultimosCuatroDigitos)
+{
+    xmlRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+        "<createTransactionRequest xmlns=\"AnetApi/xml/v1/schema/AnetApiSchema.xsd\">" +
+            "<merchantAuthentication>" +
+                "<name>merchant_name</name>" +
+                "<transactionKey>" + SECURITY_KEY + "</transactionKey>" +
+            "</merchantAuthentication>" +
+            "<transactionRequest>" +
+                "<transactionType>refundTransaction</transactionType>" +
+                "<amount>" + monto.toString() + "</amount>" +
+                "<payment>" +
+                    "<creditCard>" +
+                        "<cardNumber>" + ultimosCuatroDigitos + "</cardNumber>" +
+                        "<expirationDate>XXXX</expirationDate>" +
+                    "</creditCard>" +
+                "</payment>" +
+                "<refTransId>" + transaccionID + "</refTransId>" +
+            "</transactionRequest>" +
+        "</createTransactionRequest>";
+    
+    try
+    {
+        respuesta = invokeurl
+        [
+            url: GATEWAY_XML_URL
+            type: POST
+            parameters: xmlRequest
+            headers: {"Content-Type": "application/xml"}
+        ];
+        
+        procesarRespuestaXML(respuesta);
+    }
+    catch(e)
+    {
+        info "Error al reembolsar: " + e;
+    }
+}
+
+// ============================================
+// FUNCIÓN: Anular Transacción
+// ============================================
+void anularTransaccionXML(string transaccionID)
+{
+    xmlRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+        "<createTransactionRequest xmlns=\"AnetApi/xml/v1/schema/AnetApiSchema.xsd\">" +
+            "<merchantAuthentication>" +
+                "<name>merchant_name</name>" +
+                "<transactionKey>" + SECURITY_KEY + "</transactionKey>" +
+            "</merchantAuthentication>" +
+            "<transactionRequest>" +
+                "<transactionType>voidTransaction</transactionType>" +
+                "<refTransId>" + transaccionID + "</refTransId>" +
+            "</transactionRequest>" +
+        "</createTransactionRequest>";
+    
+    try
+    {
+        respuesta = invokeurl
+        [
+            url: GATEWAY_XML_URL
+            type: POST
+            parameters: xmlRequest
+            headers: {"Content-Type": "application/xml"}
+        ];
+        
+        procesarRespuestaXML(respuesta);
+    }
+    catch(e)
+    {
+        info "Error al anular transacción: " + e;
+    }
+}
+
+// ============================================
+// FUNCIÓN: Crear Perfil de Cliente (Customer Vault)
+// ============================================
+void crearPerfilCliente()
+{
+    xmlRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+        "<createCustomerProfileRequest xmlns=\"AnetApi/xml/v1/schema/AnetApiSchema.xsd\">" +
+            "<merchantAuthentication>" +
+                "<name>merchant_name</name>" +
+                "<transactionKey>" + SECURITY_KEY + "</transactionKey>" +
+            "</merchantAuthentication>" +
+            "<profile>" +
+                "<merchantCustomerId>CUST-" + zoho.currenttime.toString("yyyyMMddHHmmss") + "</merchantCustomerId>" +
+                "<email>" + input.Email + "</email>" +
+                "<paymentProfiles>" +
+                    "<customerType>individual</customerType>" +
+                    "<billTo>" +
+                        "<firstName>" + input.Nombre + "</firstName>" +
+                        "<lastName>" + input.Apellido + "</lastName>" +
+                    "</billTo>" +
+                    "<payment>" +
+                        "<creditCard>" +
+                            "<cardNumber>" + input.Numero_Tarjeta + "</cardNumber>" +
+                            "<expirationDate>" + input.Fecha_Expiracion + "</expirationDate>" +
+                        "</creditCard>" +
+                    "</payment>" +
+                "</paymentProfiles>" +
+            "</profile>" +
+            "<validationMode>testMode</validationMode>" +
+        "</createCustomerProfileRequest>";
+    
+    try
+    {
+        respuesta = invokeurl
+        [
+            url: GATEWAY_XML_URL
+            type: POST
+            parameters: xmlRequest
+            headers: {"Content-Type": "application/xml"}
+        ];
+        
+        // Extraer ID del perfil creado
+        perfilID = respuesta.getXmlValue("//customerProfileId");
+        info "Perfil de cliente creado: " + perfilID;
+        
+        // Guardar para uso futuro
+        input.Customer_Profile_ID = perfilID;
+    }
+    catch(e)
+    {
+        info "Error al crear perfil: " + e;
+    }
+}
+
+// ============================================
+// FUNCIÓN: Cobrar usando Perfil de Cliente
+// ============================================
+void cobrarConPerfil(string perfilID, string perfilPagoID, decimal monto)
+{
+    xmlRequest = "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+        "<createTransactionRequest xmlns=\"AnetApi/xml/v1/schema/AnetApiSchema.xsd\">" +
+            "<merchantAuthentication>" +
+                "<name>merchant_name</name>" +
+                "<transactionKey>" + SECURITY_KEY + "</transactionKey>" +
+            "</merchantAuthentication>" +
+            "<transactionRequest>" +
+                "<transactionType>authCaptureTransaction</transactionType>" +
+                "<amount>" + monto.toString() + "</amount>" +
+                "<profile>" +
+                    "<customerProfileId>" + perfilID + "</customerProfileId>" +
+                    "<paymentProfile>" +
+                        "<paymentProfileId>" + perfilPagoID + "</paymentProfileId>" +
+                    "</paymentProfile>" +
+                "</profile>" +
+            "</transactionRequest>" +
+        "</createTransactionRequest>";
+    
+    try
+    {
+        respuesta = invokeurl
+        [
+            url: GATEWAY_XML_URL
+            type: POST
+            parameters: xmlRequest
+            headers: {"Content-Type": "application/xml"}
+        ];
+        
+        procesarRespuestaXML(respuesta);
+    }
+    catch(e)
+    {
+        info "Error al cobrar con perfil: " + e;
+    }
+}
+
+// ============================================
+// NOTAS IMPORTANTES:
+// ============================================
+// 1. XML API es más moderno y estructurado que AIM
+// 2. Soporta Customer Vault para pagos recurrentes
+// 3. Mejor manejo de errores con códigos específicos
+// 4. Requiere parseo XML en las respuestas
+// 5. Ideal para integraciones más complejas

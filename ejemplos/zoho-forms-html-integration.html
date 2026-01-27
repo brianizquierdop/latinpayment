@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de Pago - Gateway Integration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="email"],
+        input[type="number"],
+        input[type="tel"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .card-details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .card-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 15px;
+        }
+        
+        .security-note {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #2e7d32;
+        }
+        
+        .btn-submit {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+        
+        .btn-submit:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error {
+            color: #d32f2f;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .error.show {
+            display: block;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .card-icon {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💳 Procesar Pago</h1>
+        <p class="subtitle">Complete los datos para procesar su pago de forma segura</p>
+        
+        <div class="security-note">
+            🔒 Conexión segura. Sus datos están protegidos con encriptación SSL.
+        </div>
+        
+        <form id="paymentForm" method="POST" action="https://secure.networkmerchants.com/gateway/transact.dll">
+            <!-- Credenciales del Gateway (ocultas) -->
+            <input type="hidden" name="x_login" value="api_key">
+            <input type="hidden" name="x_tran_key" value="TU_SECURITY_KEY_AQUI">
+            <input type="hidden" name="x_version" value="3.1">
+            <input type="hidden" name="x_type" value="AUTH_CAPTURE">
+            <input type="hidden" name="x_method" value="CC">
+            <input type="hidden" name="x_delim_data" value="TRUE">
+            <input type="hidden" name="x_delim_char" value="|">
+            <input type="hidden" name="x_relay_response" value="FALSE">
+            
+            <!-- Información del Cliente -->
+            <div class="form-group">
+                <label for="firstName">Nombre *</label>
+                <input type="text" id="firstName" name="x_first_name" required>
+                <div class="error" id="firstNameError">Por favor ingrese su nombre</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="lastName">Apellido *</label>
+                <input type="text" id="lastName" name="x_last_name" required>
+                <div class="error" id="lastNameError">Por favor ingrese su apellido</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="x_email" required>
+                <div class="error" id="emailError">Por favor ingrese un email válido</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="amount">Monto a Pagar (USD) *</label>
+                <input type="number" id="amount" name="x_amount" step="0.01" min="0.01" required>
+                <div class="error" id="amountError">Por favor ingrese un monto válido</div>
+            </div>
+            
+            <!-- Detalles de la Tarjeta -->
+            <div class="card-details">
+                <h3 style="margin-bottom: 15px; color: #333; font-size: 16px;">
+                    Información de la Tarjeta
+                    <span class="card-icon" id="cardIcon"></span>
+                </h3>
+                
+                <div class="form-group">
+                    <label for="cardNumber">Número de Tarjeta *</label>
+                    <input type="text" id="cardNumber" name="x_card_num" 
+                           maxlength="19" placeholder="1234 5678 9012 3456" required>
+                    <div class="error" id="cardNumberError">Número de tarjeta inválido</div>
+                </div>
+                
+                <div class="card-row">
+                    <div class="form-group">
+                        <label for="expDate">Fecha de Expiración *</label>
+                        <input type="text" id="expDate" name="x_exp_date" 
+                               maxlength="4" placeholder="MMYY" required>
+                        <div class="error" id="expDateError">Formato: MMYY</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cvv">CVV *</label>
+                        <input type="text" id="cvv" name="x_card_code" 
+                               maxlength="4" placeholder="123" required>
+                        <div class="error" id="cvvError">CVV inválido</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Dirección de Facturación (Opcional) -->
+            <div class="form-group">
+                <label for="address">Dirección</label>
+                <input type="text" id="address" name="x_address">
+            </div>
+            
+            <div class="form-group">
+                <label for="city">Ciudad</label>
+                <input type="text" id="city" name="x_city">
+            </div>
+            
+            <div class="card-row">
+                <div class="form-group">
+                    <label for="state">Estado</label>
+                    <input type="text" id="state" name="x_state">
+                </div>
+                
+                <div class="form-group">
+                    <label for="zip">Código Postal</label>
+                    <input type="text" id="zip" name="x_zip">
+                </div>
+            </div>
+            
+            <button type="submit" class="btn-submit" id="submitBtn">
+                🔒 Procesar Pago Seguro
+            </button>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 10px; color: #666;">Procesando pago...</p>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+        // Validación y formateo del formulario
+        const form = document.getElementById('paymentForm');
+        const cardNumberInput = document.getElementById('cardNumber');
+        const expDateInput = document.getElementById('expDate');
+        const cvvInput = document.getElementById('cvv');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        
+        // Formatear número de tarjeta con espacios
+        cardNumberInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\s/g, '');
+            let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+            e.target.value = formattedValue;
+            
+            // Detectar tipo de tarjeta
+            detectCardType(value);
+        });
+        
+        // Solo números en tarjeta
+        cardNumberInput.addEventListener('keypress', function(e) {
+            if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') {
+                e.preventDefault();
+            }
+        });
+        
+        // Formatear fecha de expiración
+        expDateInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.slice(0, 2) + value.slice(2, 4);
+            }
+            e.target.value = value;
+        });
+        
+        // Solo números en CVV
+        cvvInput.addEventListener('keypress', function(e) {
+            if (!/[0-9]/.test(e.key) && e.key !== 'Backspace') {
+                e.preventDefault();
+            }
+        });
+        
+        // Detectar tipo de tarjeta
+        function detectCardType(number) {
+            const cardIcon = document.getElementById('cardIcon');
+            const firstDigit = number.charAt(0);
+            const firstTwo = number.substring(0, 2);
+            
+            if (firstDigit === '4') {
+                cardIcon.textContent = '💳 Visa';
+            } else if (firstTwo >= '51' && firstTwo <= '55') {
+                cardIcon.textContent = '💳 Mastercard';
+            } else if (firstTwo === '34' || firstTwo === '37') {
+                cardIcon.textContent = '💳 Amex';
+            } else if (firstTwo === '60' || firstTwo === '65') {
+                cardIcon.textContent = '💳 Discover';
+            } else {
+                cardIcon.textContent = '';
+            }
+        }
+        
+        // Validar con algoritmo de Luhn
+        function validateLuhn(cardNumber) {
+            const digits = cardNumber.replace(/\s/g, '').split('').reverse();
+            let sum = 0;
+            
+            for (let i = 0; i < digits.length; i++) {
+                let digit = parseInt(digits[i]);
+                
+                if (i % 2 === 1) {
+                    digit *= 2;
+                    if (digit > 9) {
+                        digit -= 9;
+                    }
+                }
+                
+                sum += digit;
+            }
+            
+            return sum % 10 === 0;
+        }
+        
+        // Validar formulario antes de enviar
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            let isValid = true;
+            
+            // Validar número de tarjeta
+            const cardNumber = cardNumberInput.value.replace(/\s/g, '');
+            if (cardNumber.length < 13 || cardNumber.length > 19 || !validateLuhn(cardNumber)) {
+                showError('cardNumberError');
+                isValid = false;
+            } else {
+                hideError('cardNumberError');
+            }
+            
+            // Validar fecha de expiración
+            const expDate = expDateInput.value;
+            if (expDate.length !== 4) {
+                showError('expDateError');
+                isValid = false;
+            } else {
+                const month = parseInt(expDate.substring(0, 2));
+                const year = parseInt('20' + expDate.substring(2, 4));
+                const now = new Date();
+                const expiry = new Date(year, month - 1);
+                
+                if (month < 1 || month > 12 || expiry < now) {
+                    showError('expDateError');
+                    isValid = false;
+                } else {
+                    hideError('expDateError');
+                }
+            }
+            
+            // Validar CVV
+            const cvv = cvvInput.value;
+            if (cvv.length < 3 || cvv.length > 4) {
+                showError('cvvError');
+                isValid = false;
+            } else {
+                hideError('cvvError');
+            }
+            
+            // Validar monto
+            const amount = parseFloat(document.getElementById('amount').value);
+            if (isNaN(amount) || amount <= 0) {
+                showError('amountError');
+                isValid = false;
+            } else {
+                hideError('amountError');
+            }
+            
+            if (isValid) {
+                // Mostrar loading
+                submitBtn.disabled = true;
+                loading.classList.add('show');
+                
+                // Enviar formulario
+                // NOTA: En producción, esto debería enviarse a tu servidor
+                // que luego hace la llamada al gateway, NO directamente desde el navegador
+                alert('⚠️ IMPORTANTE: En producción, este formulario debe enviarse a tu servidor backend, no directamente al gateway desde el navegador por razones de seguridad PCI.');
+                
+                // Descomentar para envío real (solo en servidor backend):
+                // form.submit();
+                
+                // Simular respuesta (remover en producción)
+                setTimeout(() => {
+                    submitBtn.disabled = false;
+                    loading.classList.remove('show');
+                    alert('✅ Pago procesado exitosamente (simulación)');
+                }, 2000);
+            }
+        });
+        
+        function showError(errorId) {
+            document.getElementById(errorId).classList.add('show');
+        }
+        
+        function hideError(errorId) {
+            document.getElementById(errorId).classList.remove('show');
+        }
+        
+        // Limpiar errores al escribir
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', function() {
+                const errorId = this.id + 'Error';
+                if (document.getElementById(errorId)) {
+                    hideError(errorId);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

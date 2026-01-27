@@ -1,0 +1,225 @@
+{
+  "nombre_configuracion": "Gateway Payment Webhook - Zoho Forms",
+  "descripcion": "Configuración de webhook para procesar pagos con el Gateway Emulator desde Zoho Forms",
+  
+  "webhook_config": {
+    "url": "https://secure.networkmerchants.com/gateway/transact.dll",
+    "metodo": "POST",
+    "content_type": "application/x-www-form-urlencoded",
+    "timeout": 30
+  },
+  
+  "parametros_estaticos": {
+    "x_login": "api_key",
+    "x_tran_key": "TU_SECURITY_KEY_AQUI",
+    "x_version": "3.1",
+    "x_type": "AUTH_CAPTURE",
+    "x_method": "CC",
+    "x_delim_data": "TRUE",
+    "x_delim_char": "|",
+    "x_relay_response": "FALSE",
+    "x_encap_char": ""
+  },
+  
+  "mapeo_campos_formulario": {
+    "comentario": "Mapea los campos de tu formulario Zoho a los parámetros del gateway",
+    "campos": {
+      "x_amount": "${campo_monto}",
+      "x_card_num": "${campo_numero_tarjeta}",
+      "x_exp_date": "${campo_fecha_expiracion}",
+      "x_card_code": "${campo_cvv}",
+      "x_first_name": "${campo_nombre}",
+      "x_last_name": "${campo_apellido}",
+      "x_email": "${campo_email}",
+      "x_address": "${campo_direccion}",
+      "x_city": "${campo_ciudad}",
+      "x_state": "${campo_estado}",
+      "x_zip": "${campo_codigo_postal}",
+      "x_country": "${campo_pais}",
+      "x_phone": "${campo_telefono}",
+      "x_invoice_num": "${campo_numero_factura}",
+      "x_description": "${campo_descripcion}",
+      "x_cust_id": "${campo_id_cliente}"
+    }
+  },
+  
+  "campos_opcionales_adicionales": {
+    "x_company": "${campo_empresa}",
+    "x_po_num": "${campo_orden_compra}",
+    "x_tax": "${campo_impuesto}",
+    "x_freight": "${campo_envio}",
+    "x_duty": "${campo_arancel}",
+    "x_customer_ip": "${ip_cliente}",
+    "x_ship_to_first_name": "${envio_nombre}",
+    "x_ship_to_last_name": "${envio_apellido}",
+    "x_ship_to_address": "${envio_direccion}",
+    "x_ship_to_city": "${envio_ciudad}",
+    "x_ship_to_state": "${envio_estado}",
+    "x_ship_to_zip": "${envio_codigo_postal}",
+    "x_ship_to_country": "${envio_pais}"
+  },
+  
+  "respuesta_esperada": {
+    "formato": "delimitado",
+    "delimitador": "|",
+    "campos_respuesta": [
+      "codigo_respuesta (1=Aprobada, 2=Rechazada, 3=Error, 4=En Revisión)",
+      "codigo_sub_respuesta",
+      "codigo_razon",
+      "texto_respuesta",
+      "codigo_autorizacion",
+      "tipo_respuesta_avs",
+      "id_transaccion",
+      "numero_factura",
+      "descripcion",
+      "monto",
+      "metodo",
+      "tipo_transaccion"
+    ]
+  },
+  
+  "manejo_respuesta": {
+    "en_exito": {
+      "codigo_respuesta": "1",
+      "acciones": [
+        "Guardar ID de transacción",
+        "Guardar código de autorización",
+        "Actualizar estado del pedido",
+        "Enviar email de confirmación",
+        "Redirigir a página de éxito"
+      ]
+    },
+    "en_rechazo": {
+      "codigo_respuesta": "2",
+      "acciones": [
+        "Mostrar mensaje de error al usuario",
+        "Registrar intento fallido",
+        "Permitir reintentar",
+        "Sugerir método de pago alternativo"
+      ]
+    },
+    "en_error": {
+      "codigo_respuesta": "3",
+      "acciones": [
+        "Registrar error en logs",
+        "Notificar al administrador",
+        "Mostrar mensaje genérico al usuario",
+        "Ofrecer contacto con soporte"
+      ]
+    }
+  },
+  
+  "validaciones_pre_envio": {
+    "monto": {
+      "tipo": "decimal",
+      "minimo": 0.01,
+      "maximo": 999999.99,
+      "formato": "0.00"
+    },
+    "numero_tarjeta": {
+      "tipo": "string",
+      "longitud_minima": 13,
+      "longitud_maxima": 19,
+      "solo_numeros": true,
+      "validar_luhn": true
+    },
+    "fecha_expiracion": {
+      "tipo": "string",
+      "formato": "MMYY",
+      "longitud": 4,
+      "validar_fecha_futura": true
+    },
+    "cvv": {
+      "tipo": "string",
+      "longitud_minima": 3,
+      "longitud_maxima": 4,
+      "solo_numeros": true
+    },
+    "email": {
+      "tipo": "email",
+      "formato_valido": true
+    }
+  },
+  
+  "seguridad": {
+    "notas_importantes": [
+      "NUNCA almacenar números de tarjeta completos",
+      "Usar HTTPS siempre",
+      "No registrar datos sensibles en logs",
+      "Cumplir con PCI DSS",
+      "Encriptar datos en tránsito",
+      "Validar datos antes de enviar",
+      "Implementar rate limiting",
+      "Usar tokens para pagos recurrentes"
+    ],
+    "campos_sensibles_no_guardar": [
+      "x_card_num (número de tarjeta completo)",
+      "x_card_code (CVV)",
+      "x_exp_date (fecha de expiración)"
+    ],
+    "campos_seguros_para_guardar": [
+      "x_trans_id (ID de transacción)",
+      "x_auth_code (código de autorización)",
+      "ultimos_4_digitos_tarjeta",
+      "tipo_tarjeta",
+      "estado_transaccion"
+    ]
+  },
+  
+  "pruebas": {
+    "credenciales_test": {
+      "x_login": "api_key",
+      "x_tran_key": "demo",
+      "password": "password"
+    },
+    "tarjetas_prueba": {
+      "visa": "4111111111111111",
+      "mastercard": "5424000000000015",
+      "amex": "378282246310005",
+      "discover": "6011000000000012"
+    },
+    "datos_prueba": {
+      "fecha_expiracion": "1228",
+      "cvv": "123",
+      "monto": "10.00"
+    }
+  },
+  
+  "ejemplo_payload_completo": {
+    "x_login": "api_key",
+    "x_tran_key": "tu_security_key",
+    "x_version": "3.1",
+    "x_type": "AUTH_CAPTURE",
+    "x_method": "CC",
+    "x_amount": "99.99",
+    "x_card_num": "4111111111111111",
+    "x_exp_date": "1228",
+    "x_card_code": "123",
+    "x_first_name": "Juan",
+    "x_last_name": "Pérez",
+    "x_email": "juan.perez@ejemplo.com",
+    "x_address": "Calle Principal 123",
+    "x_city": "Ciudad",
+    "x_state": "Estado",
+    "x_zip": "12345",
+    "x_country": "US",
+    "x_phone": "555-1234",
+    "x_invoice_num": "INV-20260127-001",
+    "x_description": "Compra de productos",
+    "x_delim_data": "TRUE",
+    "x_delim_char": "|",
+    "x_relay_response": "FALSE"
+  },
+  
+  "ejemplo_respuesta_exitosa": "1|1|1|Esta transacción ha sido aprobada.|ABCDEF|Y|123456789|INV-20260127-001|Compra de productos|99.99|CC|auth_capture",
+  
+  "ejemplo_respuesta_rechazada": "2|1|2|Esta transacción ha sido rechazada.||N|0|||99.99|CC|auth_capture",
+  
+  "recursos_adicionales": {
+    "documentacion_authorize_net": "https://developer.authorize.net/api/reference/",
+    "guia_aim": "https://support.authorize.net/s/article/Authorize-Net-Advanced-Integration-Method-AIM",
+    "codigos_respuesta": "https://developer.authorize.net/api/reference/responseCodes.html",
+    "zoho_forms_webhooks": "https://help.zoho.com/portal/en/kb/forms/integrations/articles/webhooks",
+    "zoho_creator_api": "https://www.zoho.com/creator/help/api/"
+  }
+}

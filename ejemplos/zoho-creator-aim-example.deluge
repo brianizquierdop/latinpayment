@@ -1,0 +1,304 @@
+// ============================================
+// EJEMPLO: Integración Gateway con Zoho Creator
+// Método: AIM (Advanced Integration Method)
+// ============================================
+
+// CONFIGURACIÓN
+// Reemplaza estos valores con tus credenciales reales
+GATEWAY_URL = "https://secure.networkmerchants.com/gateway/transact.dll";
+API_LOGIN = "api_key";
+SECURITY_KEY = "TU_SECURITY_KEY_AQUI"; // ⚠️ CAMBIAR ESTO
+
+// ============================================
+// FUNCIÓN PRINCIPAL: Procesar Pago
+// ============================================
+void procesarPagoGateway()
+{
+    // Obtener datos del formulario
+    nombre = input.Nombre;
+    apellido = input.Apellido;
+    email = input.Email;
+    monto = input.Monto;
+    numeroTarjeta = input.Numero_Tarjeta;
+    fechaExpiracion = input.Fecha_Expiracion; // Formato: MMYY
+    cvv = input.CVV;
+    
+    // Validar datos antes de enviar
+    if(validarDatos(nombre, apellido, email, monto, numeroTarjeta, fechaExpiracion, cvv))
+    {
+        // Preparar parámetros para el gateway
+        parametros = Map();
+        parametros.put("x_login", API_LOGIN);
+        parametros.put("x_tran_key", SECURITY_KEY);
+        parametros.put("x_version", "3.1");
+        parametros.put("x_type", "AUTH_CAPTURE");
+        parametros.put("x_method", "CC");
+        parametros.put("x_amount", monto.toString());
+        
+        // Información de la tarjeta
+        parametros.put("x_card_num", numeroTarjeta);
+        parametros.put("x_exp_date", fechaExpiracion);
+        parametros.put("x_card_code", cvv);
+        
+        // Información del cliente
+        parametros.put("x_first_name", nombre);
+        parametros.put("x_last_name", apellido);
+        parametros.put("x_email", email);
+        
+        // Configuración de respuesta
+        parametros.put("x_delim_data", "TRUE");
+        parametros.put("x_delim_char", "|");
+        parametros.put("x_relay_response", "FALSE");
+        parametros.put("x_encap_char", "");
+        
+        // Información adicional (opcional)
+        parametros.put("x_invoice_num", "INV-" + zoho.currenttime.toString("yyyyMMddHHmmss"));
+        parametros.put("x_description", "Pago desde Zoho Creator");
+        
+        try
+        {
+            // Enviar solicitud al gateway
+            respuesta = invokeurl
+            [
+                url: GATEWAY_URL
+                type: POST
+                parameters: parametros
+            ];
+            
+            // Procesar respuesta
+            procesarRespuesta(respuesta);
+        }
+        catch(e)
+        {
+            info "Error al conectar con el gateway: " + e;
+            alert "Error de conexión. Por favor, intente nuevamente.";
+        }
+    }
+    else
+    {
+        alert "Por favor, complete todos los campos correctamente.";
+    }
+}
+
+// ============================================
+// FUNCIÓN: Validar Datos
+// ============================================
+boolean validarDatos(string nombre, string apellido, string email, 
+                     decimal monto, string tarjeta, string fechaExp, string cvv)
+{
+    // Validar campos vacíos
+    if(nombre.isEmpty() || apellido.isEmpty() || email.isEmpty())
+    {
+        return false;
+    }
+    
+    // Validar monto
+    if(monto <= 0)
+    {
+        return false;
+    }
+    
+    // Validar número de tarjeta (debe tener 13-19 dígitos)
+    tarjetaLimpia = tarjeta.replaceAll(" ", "").replaceAll("-", "");
+    if(tarjetaLimpia.length() < 13 || tarjetaLimpia.length() > 19)
+    {
+        return false;
+    }
+    
+    // Validar fecha de expiración (formato MMYY)
+    if(fechaExp.length() != 4)
+    {
+        return false;
+    }
+    
+    // Validar CVV (3-4 dígitos)
+    if(cvv.length() < 3 || cvv.length() > 4)
+    {
+        return false;
+    }
+    
+    return true;
+}
+
+// ============================================
+// FUNCIÓN: Procesar Respuesta del Gateway
+// ============================================
+void procesarRespuesta(string respuesta)
+{
+    // La respuesta viene delimitada por |
+    campos = respuesta.toList("|");
+    
+    // Extraer campos principales
+    codigoRespuesta = campos.get(0);        // 1=Aprobada, 2=Rechazada, 3=Error
+    codigoSubRespuesta = campos.get(1);
+    codigoRazon = campos.get(2);
+    textoRespuesta = campos.get(3);
+    codigoAutorizacion = campos.get(4);
+    transaccionID = campos.get(6);
+    
+    // Procesar según el código de respuesta
+    if(codigoRespuesta == "1")
+    {
+        // ✅ TRANSACCIÓN APROBADA
+        info "✅ Pago aprobado exitosamente";
+        info "ID de Transacción: " + transaccionID;
+        info "Código de Autorización: " + codigoAutorizacion;
+        
+        // Guardar información en el registro
+        input.Estado_Pago = "Aprobado";
+        input.Transaccion_ID = transaccionID;
+        input.Codigo_Autorizacion = codigoAutorizacion;
+        input.Fecha_Pago = zoho.currenttime;
+        
+        // Mostrar mensaje al usuario
+        alert "¡Pago procesado exitosamente!\nID de Transacción: " + transaccionID;
+        
+        // Aquí puedes agregar lógica adicional:
+        // - Enviar email de confirmación
+        // - Actualizar inventario
+        // - Generar factura
+        // - etc.
+    }
+    else if(codigoRespuesta == "2")
+    {
+        // ❌ TRANSACCIÓN RECHAZADA
+        info "❌ Pago rechazado";
+        info "Razón: " + textoRespuesta;
+        
+        input.Estado_Pago = "Rechazado";
+        input.Mensaje_Error = textoRespuesta;
+        
+        alert "Pago rechazado: " + textoRespuesta;
+    }
+    else if(codigoRespuesta == "3")
+    {
+        // ⚠️ ERROR
+        info "⚠️ Error en la transacción";
+        info "Error: " + textoRespuesta;
+        
+        input.Estado_Pago = "Error";
+        input.Mensaje_Error = textoRespuesta;
+        
+        alert "Error al procesar el pago: " + textoRespuesta;
+    }
+    else if(codigoRespuesta == "4")
+    {
+        // 🔍 EN REVISIÓN
+        info "🔍 Transacción en revisión";
+        
+        input.Estado_Pago = "En Revisión";
+        input.Transaccion_ID = transaccionID;
+        
+        alert "Su pago está en revisión. Recibirá una notificación pronto.";
+    }
+}
+
+// ============================================
+// FUNCIÓN ALTERNATIVA: Solo Autorizar (sin capturar)
+// ============================================
+void autorizarPago()
+{
+    // Similar a procesarPagoGateway() pero con x_type = "AUTH_ONLY"
+    parametros = Map();
+    parametros.put("x_login", API_LOGIN);
+    parametros.put("x_tran_key", SECURITY_KEY);
+    parametros.put("x_type", "AUTH_ONLY"); // Solo autorizar
+    // ... resto de parámetros igual
+}
+
+// ============================================
+// FUNCIÓN: Capturar Pago Previamente Autorizado
+// ============================================
+void capturarPago(string transaccionID)
+{
+    parametros = Map();
+    parametros.put("x_login", API_LOGIN);
+    parametros.put("x_tran_key", SECURITY_KEY);
+    parametros.put("x_type", "PRIOR_AUTH_CAPTURE");
+    parametros.put("x_trans_id", transaccionID);
+    
+    try
+    {
+        respuesta = invokeurl
+        [
+            url: GATEWAY_URL
+            type: POST
+            parameters: parametros
+        ];
+        
+        procesarRespuesta(respuesta);
+    }
+    catch(e)
+    {
+        info "Error al capturar pago: " + e;
+    }
+}
+
+// ============================================
+// FUNCIÓN: Reembolsar Pago
+// ============================================
+void reembolsarPago(string transaccionID, decimal monto, string ultimosCuatroDigitos)
+{
+    parametros = Map();
+    parametros.put("x_login", API_LOGIN);
+    parametros.put("x_tran_key", SECURITY_KEY);
+    parametros.put("x_type", "CREDIT");
+    parametros.put("x_trans_id", transaccionID);
+    parametros.put("x_amount", monto.toString());
+    parametros.put("x_card_num", ultimosCuatroDigitos); // Solo últimos 4 dígitos
+    
+    try
+    {
+        respuesta = invokeurl
+        [
+            url: GATEWAY_URL
+            type: POST
+            parameters: parametros
+        ];
+        
+        procesarRespuesta(respuesta);
+    }
+    catch(e)
+    {
+        info "Error al reembolsar: " + e;
+    }
+}
+
+// ============================================
+// FUNCIÓN: Anular Transacción
+// ============================================
+void anularTransaccion(string transaccionID)
+{
+    parametros = Map();
+    parametros.put("x_login", API_LOGIN);
+    parametros.put("x_tran_key", SECURITY_KEY);
+    parametros.put("x_type", "VOID");
+    parametros.put("x_trans_id", transaccionID);
+    
+    try
+    {
+        respuesta = invokeurl
+        [
+            url: GATEWAY_URL
+            type: POST
+            parameters: parametros
+        ];
+        
+        procesarRespuesta(respuesta);
+    }
+    catch(e)
+    {
+        info "Error al anular transacción: " + e;
+    }
+}
+
+// ============================================
+// NOTAS IMPORTANTES:
+// ============================================
+// 1. NUNCA almacenes números de tarjeta completos
+// 2. Usa HTTPS siempre
+// 3. Valida datos antes de enviar
+// 4. Maneja errores apropiadamente
+// 5. Registra solo IDs de transacción, no datos sensibles
+// 6. Prueba con credenciales demo/password primero
+// 7. Cumple con PCI DSS
